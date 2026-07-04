@@ -1,49 +1,32 @@
-const USAGE_KEY = "lm_usage";
+import { createClient } from "./supabase/client";
+
 export const FREE_DAILY_LIMIT = 3;
 
-function todayKey(): string {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+/**
+ * Reads today's usage count directly from Supabase (RLS allows a user to
+ * read only their own row). This is a read-only helper for UI display —
+ * the actual enforcement happens server-side in /api/generate, so a user
+ * can never bypass their limit by editing client code.
+ */
+export async function getUsedToday(userId: string): Promise<number> {
+  const supabase = createClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data } = await supabase
+    .from("daily_usage")
+    .select("count")
+    .eq("user_id", userId)
+    .eq("usage_date", today)
+    .single();
+
+  return data?.count || 0;
 }
 
-interface Usage {
-  date: string;
-  count: number;
-}
-
-function readUsage(userId: string): Usage {
-  if (typeof window === "undefined") return { date: todayKey(), count: 0 };
-  try {
-    const raw = localStorage.getItem(`${USAGE_KEY}_${userId}`);
-    const parsed: Usage | null = raw ? JSON.parse(raw) : null;
-    if (!parsed || parsed.date !== todayKey()) {
-      return { date: todayKey(), count: 0 };
-    }
-    return parsed;
-  } catch {
-    return { date: todayKey(), count: 0 };
-  }
-}
-
-function writeUsage(userId: string, usage: Usage) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(`${USAGE_KEY}_${userId}`, JSON.stringify(usage));
-}
-
-export function getUsedToday(userId: string): number {
-  return readUsage(userId).count;
-}
-
-export function getRemaining(userId: string, isPro: boolean): number {
+export async function getRemaining(
+  userId: string,
+  isPro: boolean
+): Promise<number> {
   if (isPro) return Infinity;
-  return Math.max(0, FREE_DAILY_LIMIT - getUsedToday(userId));
-}
-
-export function canGenerate(userId: string, isPro: boolean): boolean {
-  if (isPro) return true;
-  return getUsedToday(userId) < FREE_DAILY_LIMIT;
-}
-
-export function recordGeneration(userId: string) {
-  const usage = readUsage(userId);
-  writeUsage(userId, { date: usage.date, count: usage.count + 1 });
+  const used = await getUsedToday(userId);
+  return Math.max(0, FREE_DAILY_LIMIT - used);
 }

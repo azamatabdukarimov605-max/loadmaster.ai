@@ -1,23 +1,35 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Trash2, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { GeneratedContent } from "@/lib/types";
 import { deleteHistoryItem, getHistory } from "@/lib/storage";
 import { ResultCard } from "./ResultCard";
 
-export function HistoryList({ userId }: { userId: string }) {
+export function HistoryList({ refreshKey }: { refreshKey?: number }) {
   const [history, setHistory] = useState<GeneratedContent[]>([]);
+  const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => {
-    setHistory(getHistory(userId));
-  }, [userId]);
+    setLoading(true);
+    getHistory()
+      .then(setHistory)
+      .finally(() => setLoading(false));
+  }, [refreshKey]);
 
-  const handleDelete = (id: string) => {
-    deleteHistoryItem(userId, id);
+  const handleDelete = async (id: string) => {
     setHistory((h) => h.filter((item) => item.id !== id));
+    await deleteHistoryItem(id);
   };
+
+  if (loading) {
+    return (
+      <div className="card flex items-center justify-center p-10">
+        <Loader2 className="animate-spin text-neon" size={22} />
+      </div>
+    );
+  }
 
   if (history.length === 0) {
     return (

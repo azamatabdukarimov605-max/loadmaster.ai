@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Crown } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
@@ -13,6 +13,7 @@ import Link from "next/link";
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -58,13 +59,13 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <Generator />
+          <Generator onGenerated={() => setRefreshKey((k) => k + 1)} />
 
           <div className="mt-16">
             <h2 className="mb-6 font-display text-xl font-bold text-ink-900 dark:text-white">
               Your generation history
             </h2>
-            <HistoryList userId={user.id} />
+            <HistoryList refreshKey={refreshKey} />
           </div>
         </div>
       </main>

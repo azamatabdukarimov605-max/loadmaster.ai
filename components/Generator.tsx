@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Sparkles, Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { canGenerate, getRemaining, recordGeneration } from "@/lib/credits";
-import { saveToHistory } from "@/lib/storage";
-import { generateFallbackContent } from "@/lib/generator";
+import { getRemaining } from "@/lib/credits";
 import { GeneratedContent } from "@/lib/types";
 import { ResultCard } from "./ResultCard";
 import Link from "next/link";
@@ -18,15 +16,24 @@ const EXAMPLES = [
   "oversized load hauler",
 ];
 
-export function Generator() {
+export function Generator({
+  onGenerated,
+}: {
+  onGenerated?: () => void;
+}) {
   const { user } = useAuth();
   const [niche, setNiche] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<GeneratedContent | null>(null);
+  const [remaining, setRemaining] = useState<number | null>(null);
 
   const isPro = user?.plan === "pro";
-  const remaining = user ? getRemaining(user.id, isPro) : 3;
+
+  useEffect(() => {
+    if (!user) return;
+    getRemaining(user.id, isPro).then(setRemaining);
+  }, [user, isPro, result]);
 
   const handleGenerate = async () => {
     setError(null);
@@ -41,33 +48,23 @@ export function Generator() {
       return;
     }
 
-    if (!canGenerate(user.id, isPro)) {
-      setError(
-        "You've used all your free generations for today. Upgrade to Pro for unlimited access."
-      );
-      return;
-    }
-
     setLoading(true);
     try {
-      let content: GeneratedContent;
-      try {
-        const res = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ niche }),
-        });
-        if (!res.ok) throw new Error("API error");
-        content = await res.json();
-      } catch {
-        // If the API route is unreachable (e.g. static export), fall back
-        // to fully client-side generation so the app still works.
-        content = generateFallbackContent(niche);
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ niche }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Something went wrong. Please try again.");
+        return;
       }
 
-      recordGeneration(user.id);
-      saveToHistory(user.id, content);
-      setResult(content);
+      setResult(data);
+      onGenerated?.();
     } catch (e) {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -123,7 +120,9 @@ export function Generator() {
             <span className="text-ink-500 dark:text-slate-400">
               {isPro
                 ? "Unlimited generations — Pro plan"
-                : `${remaining} of 3 free generations left today`}
+                : remaining !== null
+                ? `${remaining} of 3 free generations left today`
+                : "Loading usage..."}
             </span>
           ) : (
             <Link

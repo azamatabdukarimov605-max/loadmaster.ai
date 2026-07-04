@@ -1,31 +1,23 @@
 import { GeneratedContent } from "./types";
 
-const HISTORY_KEY = "lm_history";
+/**
+ * Thin client-side wrapper around the /api/generations route, which reads
+ * and writes to Supabase under Row Level Security (a user can only ever
+ * see or delete their own rows).
+ */
 
-export function getHistory(userId: string): GeneratedContent[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(`${HISTORY_KEY}_${userId}`);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+export async function getHistory(): Promise<GeneratedContent[]> {
+  const res = await fetch("/api/generations");
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.history || [];
 }
 
-export function saveToHistory(userId: string, item: GeneratedContent) {
-  if (typeof window === "undefined") return;
-  const history = getHistory(userId);
-  const updated = [item, ...history].slice(0, 100);
-  localStorage.setItem(`${HISTORY_KEY}_${userId}`, JSON.stringify(updated));
-}
-
-export function clearHistory(userId: string) {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(`${HISTORY_KEY}_${userId}`);
-}
-
-export function deleteHistoryItem(userId: string, id: string) {
-  if (typeof window === "undefined") return;
-  const history = getHistory(userId).filter((h) => h.id !== id);
-  localStorage.setItem(`${HISTORY_KEY}_${userId}`, JSON.stringify(history));
+export async function deleteHistoryItem(id: string): Promise<boolean> {
+  const res = await fetch("/api/generations", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+  return res.ok;
 }

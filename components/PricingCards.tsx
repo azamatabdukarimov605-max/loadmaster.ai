@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Check, Zap } from "lucide-react";
+import { useState } from "react";
+import { Check, Zap, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { FREE_DAILY_LIMIT } from "@/lib/credits";
 
@@ -22,6 +23,16 @@ const proFeatures = [
 
 export function PricingCards() {
   const { user, upgradeToPro } = useAuth();
+  const [upgrading, setUpgrading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
+
+  const handleUpgrade = async () => {
+    setUpgrading(true);
+    setUpgradeError(null);
+    const result = await upgradeToPro();
+    setUpgrading(false);
+    if (result.error) setUpgradeError(result.error);
+  };
 
   return (
     <div className="mx-auto grid max-w-4xl grid-cols-1 gap-8 md:grid-cols-2">
@@ -88,9 +99,24 @@ export function PricingCards() {
               You're on Pro
             </button>
           ) : (
-            <button onClick={upgradeToPro} className="btn-primary mt-8 w-full">
-              Upgrade to Pro
-            </button>
+            <>
+              <button
+                onClick={handleUpgrade}
+                disabled={upgrading}
+                className="btn-primary mt-8 w-full disabled:opacity-70"
+              >
+                {upgrading ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  "Upgrade to Pro"
+                )}
+              </button>
+              {upgradeError && (
+                <p className="mt-3 rounded-lg bg-red-500/10 px-4 py-2.5 text-xs text-red-400">
+                  {upgradeError}
+                </p>
+              )}
+            </>
           )
         ) : (
           <Link href="/signup" className="btn-primary mt-8 w-full">
